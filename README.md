@@ -1,10 +1,10 @@
-# <div align="center"> ~ [<ins>**UInteract**</ins>](https://github.com/archadiumm/UInteract/releases/tag/release) ~ </div> 
+# <div align="center"> ~ [<ins>**UInteract**</ins>](https://github.com/archadiumm/UInteract/releases/latest) ~ </div> 
 
 **UInteract** is a roblox library that can detect UI interactions, like collisions for example. It features a collision grouping system, and also supports rotated object collisions unlike some other libraries.
 
 # Documentation
 
-Firstly, you should download **UInteract** from the [latest release](https://github.com/archadiumm/UInteract/releases/tag/release). Next, create a new LocalScript to start things off.
+Firstly, you should download **UInteract** from the [latest release](https://github.com/archadiumm/UInteract/releases/latest). Next, create a new LocalScript to start things off.
 
 To use **UInteract**, you need to convert your GuiObject to a UIObject using `UInteract.new` or `UInteract.find`.
 ```luau
