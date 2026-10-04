@@ -1,21 +1,6 @@
 --!optimize 2
 --!strict
 
--- // TYPES // --
-
-type Compatible = Frame | TextButton | ImageButton | TextLabel | ImageLabel
-type SignalName = "Touched"
-type Callback = (colliding: {Object}) -> ()
-type ConnectionTable = {
-	Touched: Callback?,
-}
-type CollisionGroupMap = {[string]: {string}}
-
-export type Object = setmetatable<{
-	Instance: Compatible,
-	CollisionGroup: string,
-}, typeof(UInteract)>
-
 -- // CONSTANTS // --
 
 local RunService = game:GetService("RunService")
@@ -32,6 +17,21 @@ local connections: {[Object]: ConnectionTable} = {}
 local lastColliding: {[Object]: {Object}} = {}
 local objects: {[Compatible]: Object} = {}
 local compatibleObjects: {string} = {"Frame", "TextButton", "ImageButton", "TextLabel", "ImageLabel"}
+
+-- // TYPES // --
+
+type Compatible = Frame | TextButton | ImageButton | TextLabel | ImageLabel
+type SignalName = "Touched"
+type Callback = (colliding: {Object}) -> ()
+type ConnectionTable = {
+	Touched: Callback?,
+}
+type CollisionGroupMap = {[string]: {string}}
+
+export type Object = setmetatable<{
+	Instance: Compatible,
+	CollisionGroup: string,
+}, typeof(UInteract)>
 
 -- // UTILITIES // --
 
