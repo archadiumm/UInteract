@@ -3,79 +3,78 @@
 
 -- // CONSTANTS // --
 
-const RunService = game:GetService("RunService")
+local RunService = game:GetService("RunService")
 
-const UInteract = {}
-const UIObject = {}
+local UInteract = {}
+local UIObject = {}
 UInteract.__index = UIObject
 
-const collisionGroups: {[string]: {string}} = {
-	Default = {"Default"}
+type Compatible = Frame | TextButton | ImageButton | TextLabel | ImageLabel
+type SignalName = "Touched"
+type Callback = (colliding: {Object}) -> ()
+type ConnectionTable = {
+	Touched: Callback?,
+}
+type CollisionGroupMap = {[string]: {string}}
+
+local collisionGroups: CollisionGroupMap = {
+	Default = {"Default"},
 }
 
-const connections: {[Object]: {[string]: (any?) -> (any?)}} = {}
-const lastColliding: {[Object]: {Object}} = {}
-const objects: {[Compatible]: Object} = {}
-
-const compatibleObjects: {string} = {"Frame", "TextButton", "ImageButton", "TextLabel", "ImageLabel"}
+local connections: {[Object]: ConnectionTable} = {}
+local lastColliding: {[Object]: {Object}} = {}
+local objects: {[Compatible]: Object} = {}
+local compatibleObjects: {string} = {"Frame", "TextButton", "ImageButton", "TextLabel", "ImageLabel"}
 
 -- // TYPES // --
 
-type Compatible = (Frame | TextButton | ImageButton | TextLabel | ImageLabel)
-
 export type Object = setmetatable<{
 	Instance: Compatible,
-	CollisionGroup: string
+	CollisionGroup: string,
 }, typeof(UInteract)>
 
--- // FUNCTIONS // --
+-- // UTILITIES // --
 
-const function debugWhere(): (string, string)
+local function debugWhere(): (string, string)
 	local level = 0
-
-	local scriptName: string = debug.info(level, "s")
-	local line: string = debug.info(level, "l")
+	local scriptName: string = debug.info(level, "s") or "[NIL]"
+	local line: string = tostring(debug.info(level, "l") or "[NIL]")
 
 	repeat
-		scriptName = debug.info(level, "s")
-		line = debug.info(level, "l")
-
+		scriptName = debug.info(level, "s") or "[NIL]"
+		line = tostring(debug.info(level, "l") or "[NIL]")
 		level += 1
 
 		if level > 25 then
 			scriptName = "[NIL]"
 			line = "[NIL]"
-
 			break
 		end
-
-	until level > 0 and not script:GetFullName():find(scriptName) and scriptName ~= "[C]" and line > 0
+	until level > 0 and not script:GetFullName():find(scriptName) and scriptName ~= "[C]" and tonumber(line) ~= nil and tonumber(line) > 0
 
 	return scriptName, line
 end
 
-const function getCorners(instance: Compatible): {Vector2}
-	const pos = instance.AbsolutePosition
-	const size = instance.AbsoluteSize
-	const angle = math.rad(instance.Rotation)
+local function getCorners(instance: Compatible): {Vector2}
+	local pos = instance.AbsolutePosition
+	local size = instance.AbsoluteSize
+	local angle = math.rad(instance.Rotation)
 
-	const half = size / 2
-	const center = pos + half
-
-	const corners = {
+	local half = size / 2
+	local center = pos + half
+	local corners = {
 		Vector2.new(-half.X, -half.Y),
-		Vector2.new( half.X, -half.Y),
-		Vector2.new( half.X,  half.Y),
-		Vector2.new(-half.X,  half.Y),
+		Vector2.new(half.X, -half.Y),
+		Vector2.new(half.X, half.Y),
+		Vector2.new(-half.X, half.Y),
 	}
 
-	const result: {Vector2} = {}
-
-	const cos = math.cos(angle)
-	const sin = math.sin(angle)
+	local result: {Vector2} = {}
+	local cos = math.cos(angle)
+	local sin = math.sin(angle)
 
 	for _, corner in corners do
-		const rotated = Vector2.new(
+		local rotated = Vector2.new(
 			corner.X * cos - corner.Y * sin,
 			corner.X * sin + corner.Y * cos
 		)
@@ -86,23 +85,22 @@ const function getCorners(instance: Compatible): {Vector2}
 	return result
 end
 
-const function getAxes(corners: {Vector2}): {Vector2}
-	const edge1 = corners[2] - corners[1]
-	const edge2 = corners[4] - corners[1]
+local function getAxes(corners: {Vector2}): {Vector2}
+	local edge1 = corners[2] - corners[1]
+	local edge2 = corners[4] - corners[1]
 
 	return {
 		edge1.Unit,
-		edge2.Unit
+		edge2.Unit,
 	}
 end
 
-const function project(corners: {Vector2}, axis: Vector2): (number, number)
+local function project(corners: {Vector2}, axis: Vector2): (number, number)
 	local min = math.huge
 	local max = -math.huge
 
 	for _, point: Vector2 in ipairs(corners) do
-		const value = point:Dot(axis)
-
+		local value = point:Dot(axis)
 		min = math.min(min, value)
 		max = math.max(max, value)
 	end
@@ -110,15 +108,14 @@ const function project(corners: {Vector2}, axis: Vector2): (number, number)
 	return min, max
 end
 
-const function overlap(minA: number, maxA: number, minB: number, maxB: number)
+local function overlap(minA: number, maxA: number, minB: number, maxB: number): boolean
 	return maxA >= minB and maxB >= minA
 end
 
-const function isOverlapping(instance1: Compatible, instance2: Compatible)
-	const cornersA = getCorners(instance1)
-	const cornersB = getCorners(instance2)
-
-	const axes = {}
+local function isOverlapping(instance1: Compatible, instance2: Compatible): boolean
+	local cornersA = getCorners(instance1)
+	local cornersB = getCorners(instance2)
+	local axes: {Vector2} = {}
 
 	for _, axis: Vector2 in getAxes(cornersA) do
 		table.insert(axes, axis)
@@ -129,8 +126,8 @@ const function isOverlapping(instance1: Compatible, instance2: Compatible)
 	end
 
 	for _, axis in axes do
-		const minA, maxA = project(cornersA, axis)
-		const minB, maxB = project(cornersB, axis)
+		local minA, maxA = project(cornersA, axis)
+		local minB, maxB = project(cornersB, axis)
 
 		if not overlap(minA, maxA, minB, maxB) then
 			return false
@@ -149,24 +146,28 @@ end
 -- UIObject → Object that was created.
 function UInteract.new(instance: Compatible): Object?
 	if not instance or not table.find(compatibleObjects, instance.ClassName) then
-		const scriptName, line = debugWhere()
-		
-		warn(`┏ [UInteract] Instance was not found, or it is not compatible.`)
-		return warn(`┗ [UInteract] Go to script: {scriptName} on line {line} to fix this.`) :: Object?
-	elseif objects[instance] then
+		local scriptName, line = debugWhere()
+		warn("┏ [UInteract] Instance was not found, or it is not compatible.")
+		warn(`┗ [UInteract] Go to script: {scriptName} on line {line} to fix this.`)
+		return nil
+	end
+
+	if objects[instance] then
 		return objects[instance]
 	end
-	
-	const new = setmetatable({
+
+	local newObject = setmetatable({
 		Instance = instance,
-		CollisionGroup = "Default"
+		CollisionGroup = "Default",
 	}, UInteract)
-	
-	objects[instance] = new
-	connections[new] = {}
-	lastColliding[new] = {}
-	
-	return new
+
+	objects[instance] = newObject
+	connections[newObject] = {
+		Touched = nil,
+	}
+	lastColliding[newObject] = {}
+
+	return newObject
 end
 
 -- | Parameters:
@@ -175,13 +176,13 @@ end
 -- | Returns:
 -- UIObject → If found, it will return a UIObject. If not, it will make one.
 function UInteract.getObject(instance: Compatible): Object?
-	local find = objects[instance]
-	
-	if not find then
-		find = UInteract.new(instance)
+	local found = objects[instance]
+
+	if not found then
+		found = UInteract.new(instance)
 	end
-	
-	return find
+
+	return found
 end
 
 -- | Parameters:
@@ -189,7 +190,7 @@ end
 --
 -- | Returns:
 -- {[string]: {string}} → List of all collision groups.
-function UInteract.getCollisionGroups(): {[string]: {string}}
+function UInteract.getCollisionGroups(): CollisionGroupMap
 	return collisionGroups
 end
 
@@ -211,46 +212,50 @@ function UIObject:setCollision(collisionGroup: string): Object
 	if not collisionGroups[collisionGroup] then
 		collisionGroups[collisionGroup] = {}
 	end
-	
+
 	self = self :: Object
 	self.CollisionGroup = collisionGroup
-	
 	return self
 end
 
 function UIObject:getColliding(): {Object}
-	const colliding: {Object} = {}
-	const instances: {Compatible} = {}
-	
+	local colliding: {Object} = {}
+	local instances: {Compatible} = {}
+
 	self = self :: Object
-	const myGroup = self.CollisionGroup
-	const myInstance = self.Instance
-	
-	for instance: Compatible, object: Object in objects do
-		if instance == self.Instance then
+	local myGroup = self.CollisionGroup
+	local myInstance = self.Instance
+	local myGroupCollisions = collisionGroups[myGroup]
+
+	if myGroupCollisions == nil then
+		return colliding
+	end
+
+	for instance: Compatible, object: Object in pairs(objects) do
+		if instance == myInstance then
 			continue
 		end
-		
-		if table.find(collisionGroups[myGroup], object.CollisionGroup) then
+
+		if table.find(myGroupCollisions, object.CollisionGroup) then
 			table.insert(instances, instance)
 		end
 	end
-	
+
 	for _, instance: Compatible in ipairs(instances) do
 		if isOverlapping(myInstance, instance) then
 			table.insert(colliding, objects[instance])
 		end
 	end
-	
+
 	return colliding
 end
 
-function UIObject:Touched(callback: (colliding: {Object}) -> ()): ()
+function UIObject:Touched(callback: Callback): ()
 	self = self :: Object
 	connections[self].Touched = callback
 end
 
-function UIObject:Disconnect(signal: ("Touched")): ()
+function UIObject:Disconnect(signal: SignalName): ()
 	self = self :: Object
 	connections[self][signal] = nil
 end
@@ -258,27 +263,28 @@ end
 -- // COLLISION LOOP // --
 
 RunService:BindToRenderStep("UInteract", 1, function()
-	for instance: Compatible, object: Object in objects do
-		const colliding = object:getColliding()
-		
-		if #colliding == #lastColliding[object] then
+	for _, object: Object in pairs(objects) do
+		local previousColliding = lastColliding[object] or {}
+		local colliding = object:getColliding()
+
+		if #colliding == #previousColliding then
 			continue
 		end
-		
-		const new = #colliding >= #lastColliding[object]
+
+		local isNewCollision = #colliding > #previousColliding
 		lastColliding[object] = colliding
-		
-		if new and connections[object]["Touched"] then
-			xpcall(function()
-				const newColliding = {}
-				
-				for _, object: Object in ipairs(colliding) do
-					if not table.find(lastColliding[object], object) then
-						table.insert(newColliding, object)
-					end
+
+		if isNewCollision and connections[object].Touched then
+			local newColliding: {Object} = {}
+
+			for _, collidingObject in ipairs(colliding) do
+				if not table.find(previousColliding, collidingObject) then
+					table.insert(newColliding, collidingObject)
 				end
-				
-				connections[object]["Touched"](newColliding)
+			end
+
+			xpcall(function()
+				connections[object].Touched(newColliding)
 			end, function(errorText: string)
 				warn(`┏ [UInteract] {object.Instance.Name}.Touched failed to run. See error below:`)
 				warn(`┗ [UInteract] {errorText}`)
