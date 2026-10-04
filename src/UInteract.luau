@@ -1,13 +1,7 @@
 --!optimize 2
 --!strict
 
--- // CONSTANTS // --
-
-local RunService = game:GetService("RunService")
-
-local UInteract = {}
-local UIObject = {}
-UInteract.__index = UIObject
+-- // TYPES // --
 
 type Compatible = Frame | TextButton | ImageButton | TextLabel | ImageLabel
 type SignalName = "Touched"
@@ -17,6 +11,19 @@ type ConnectionTable = {
 }
 type CollisionGroupMap = {[string]: {string}}
 
+export type Object = setmetatable<{
+	Instance: Compatible,
+	CollisionGroup: string,
+}, typeof(UInteract)>
+
+-- // CONSTANTS // --
+
+local RunService = game:GetService("RunService")
+
+local UInteract = {}
+local UIObject = {}
+UInteract.__index = UIObject
+
 local collisionGroups: CollisionGroupMap = {
 	Default = {"Default"},
 }
@@ -25,13 +32,6 @@ local connections: {[Object]: ConnectionTable} = {}
 local lastColliding: {[Object]: {Object}} = {}
 local objects: {[Compatible]: Object} = {}
 local compatibleObjects: {string} = {"Frame", "TextButton", "ImageButton", "TextLabel", "ImageLabel"}
-
--- // TYPES // --
-
-export type Object = setmetatable<{
-	Instance: Compatible,
-	CollisionGroup: string,
-}, typeof(UInteract)>
 
 -- // UTILITIES // --
 
